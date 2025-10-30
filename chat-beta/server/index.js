@@ -28,8 +28,16 @@ io.on('connection', (socket) => {
 app.use(logger('dev'))
 
 app.get('/', (req, res) => {
-    res.sendFile(process.cwd() + '/client/index.html')
+    res.sendFile(process.cwd() + '/client/login.html')
 })
+
+app.get('/chat', (req, res) => {
+  res.sendFile(process.cwd() + '/client/index.html');
+});
+
+app.use(express.static(process.cwd() + '/client'));
+
+
 server.listen(port, () => {
   console.log(`Server running on port ${port}`)
 })

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar Sesión - UGMA</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #0b1c2e; /* azul oscuro */
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .login-container {
+      background-color: #f9e79f; /* amarillo pastel */
+      padding: 30px;
+      border-radius: 12px;
+      width: 320px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      text-align: center;
+      color: #0b1c2e;
+    }
+
+    .login-container h2 {
+      margin-bottom: 20px;
+      font-size: 24px;
+    }
+
+    .logo img {
+      width: 80px;
+      height: auto;
+      margin-bottom: 10px;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      width: 90%;
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    button {
+      background-color: #0b1c2e;
+      color: #f9e79f;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 20px;
+      cursor: pointer;
+      width: 95%;
+      font-size: 16px;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background-color: #102c45;
+    }
+
+    .register-link {
+      display: block;
+      margin-top: 15px;
+      color: #0b1c2e;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .register-link:hover {
+      text-decoration: underline;
+    }
+
+    .error-message {
+      color: red;
+      font-size: 14px;
+      margin-top: 10px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="logo">
+      <img src="/assets/ugma_logo.png" alt="Logo UGMA">
+    </div>
+    <h2>Iniciar Sesión</h2>
+    <form id="loginForm">
+      <input type="text" id="cedula" placeholder="Cédula" required>
+      <input type="password" id="contrasena" placeholder="Contraseña" required>
+      <button type="submit">Ingresar</button>
+      <p class="error-message" id="errorMsg">Cédula o contraseña incorrecta</p>
+    </form>
+    <a href="#" class="register-link">¿No tienes cuenta? Regístrate</a>
+  </div>
+
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const cedula = document.getElementById('cedula').value;
+      const contrasena = document.getElementById('contrasena').value;
+      const errorMsg = document.getElementById('errorMsg');
+
+      // Acceso alternativo local
+      if (cedula === "223344" && contrasena === "admin") {
+        window.location.href = "/chat";
+        return;
+      }
+
+      try {
+        // Ejemplo para conexión con backend
+        const response = await fetch('https://tu-servidor.com/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cedula, contrasena })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            window.location.href = "/chat";
+          } else {
+            errorMsg.style.display = "block";
+          }
+        } else {
+          errorMsg.style.display = "block";
+        }
+      } catch (error) {
+        console.error(error);
+        errorMsg.style.display = "block";
+      }
+    });
+  </script>
+</body>
+</html>
