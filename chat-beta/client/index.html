@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -6,35 +7,38 @@
   <title>Chat UGMA</title>
 
   <script type="module">
-import { io } from 'https://cdn.socket.io/4.3.2/socket.io.esm.min.js'
+    import { io } from 'https://cdn.socket.io/4.3.2/socket.io.esm.min.js'
 
-const socket = io()
+    const socket = io({
+      auth: {
+      userId: 0,
+      rol: 0,
+        serverOffset: 0
+      }
+    })
+    const form = document.getElementById('form')
+    const inputMessage = document.getElementById('inputMessage')
+    const messages = document.getElementById('messages')
 
-const form = document.getElementById('form')
-const inputMessage = document.getElementById('inputMessage')
-const messages = document.getElementById('messages')
+    socket.on('chat message', (msg, serverOffset) => {
+      const item = `<li class="message-item received">${msg}</li>`
+      messages.insertAdjacentHTML('beforeend', item)
+      socket.auth.serverOffset = serverOffset
+      messages.scrollTop = messages.scrollHeight
+    })
 
-socket.on('chat message', (msg) => {
-  const item = `<li class="message-item received">${msg}</li>`
-  messages.insertAdjacentHTML('beforeend', item)
-  messages.scrollTop = messages.scrollHeight
-})
-
-// Mensaje enviado
-form.addEventListener('submit', (e) => {
-  e.preventDefault()
-  const message = inputMessage.value.trim()
-  if (message) {
-    const item = `<li class="message-item sent">${message}</li>`
-    messages.insertAdjacentHTML('beforeend', item)
-    socket.emit('chat message', message)
-    inputMessage.value = ''
-    messages.scrollTop = messages.scrollHeight
-  }
-
-})
-
-</script>
+    form.addEventListener('submit', (e) => {
+      e.preventDefault()
+      const message = inputMessage.value.trim()
+      if (message) {
+        const item = `<li class="message-item sent">${message}</li>`
+        messages.insertAdjacentHTML('beforeend', item)
+        socket.emit('chat message', message)
+        inputMessage.value = ''
+        messages.scrollTop = messages.scrollHeight
+      }
+    })
+  </script>
 
   <style>
     :root {
@@ -50,7 +54,6 @@ form.addEventListener('submit', (e) => {
       background-color: var(--azul-oscuro);
       margin: 0;
       padding: 0;
-      color: var(--azul-oscuro);
     }
 
     header {
@@ -62,18 +65,58 @@ form.addEventListener('submit', (e) => {
       background-color: var(--azul-oscuro);
       color: var(--amarillo-pastel);
       position: relative;
+      cursor: pointer;
     }
 
     header::after {
       content: "☰";
       position: absolute;
       right: 20px;
-      top: 15px;
-      font-size: 1.2em;
-      color: var(--amarillo-pastel);
-      cursor: pointer;
+      top: 14px;
+      font-size: 1.3em;
     }
 
+    /* ✅ Menú lateral actualizado */
+    .side-menu {
+      position: fixed;
+      top: 0;
+      right: -300px; /* ahora se oculta hacia la derecha */
+      width: 260px;
+      height: 100vh;
+      background: var(--azul-oscuro);
+      border-left: 2px solid var(--amarillo-pastel);
+      transition: 0.3s ease-in-out;
+      padding: 80px 20px;
+      z-index: 999;
+    }
+
+    .side-menu.active {
+      right: 0;
+    }
+
+    .side-menu ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .side-menu ul li {
+      font-size: 17px;
+      margin: 22px 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      color: var(--amarillo-pastel);
+      font-weight: 500;
+    }
+
+    .side-menu ul li i {
+      margin-right: 12px;
+      font-size: 20px;
+      color: var(--amarillo-pastel);
+    }
+
+
+    /* ✅ Chat */
     .chat-container {
       max-width: 400px;
       margin: 20px auto;
@@ -103,20 +146,16 @@ form.addEventListener('submit', (e) => {
       border-radius: 8px;
       padding: 8px 12px;
       margin-bottom: 10px;
-      word-wrap: break-word;
       max-width: 70%;
       font-size: 0.95em;
-      line-height: 1.3em;
     }
 
-    /* Mensajes recibidos (izquierda) */
     .message-item.received {
       align-self: flex-start;
       background-color: var(--blanco);
       border-top-left-radius: 0;
     }
 
-    /* Mensajes enviados (derecha) */
     .message-item.sent {
       align-self: flex-end;
       background-color: var(--amarillo-pastel);
@@ -133,16 +172,9 @@ form.addEventListener('submit', (e) => {
     .input-area input {
       flex: 1;
       padding: 10px;
-      border: 1px solid var(--amarillo-pastel);
       border-radius: 4px;
       background-color: var(--blanco);
       color: var(--azul-oscuro);
-      font-size: 1em;
-      outline: none;
-    }
-
-    .input-area input::placeholder {
-      color: #888;
     }
 
     .input-area button {
@@ -154,54 +186,62 @@ form.addEventListener('submit', (e) => {
       border-radius: 4px;
       font-weight: bold;
       cursor: pointer;
-      transition: background-color 0.3s ease;
     }
 
-    .input-area button:hover {
-      background-color: #f9e248;
+    @keyframes aparecer {
+      from { opacity:0; transform: translateY(100px); }
+      to   { opacity:1; transform: translateY(0); }
     }
 
-    /* Scrollbar personalizada */
-    .messages::-webkit-scrollbar {
-      width: 8px;
+    .message-item {
+      animation: aparecer 0.3s ease forwards;
     }
-
-    .messages::-webkit-scrollbar-thumb {
-      background-color: var(--amarillo-pastel);
-      border-radius: 4px;
-    }
-    
-/* Animación suave de aparición de mensajes */
-@keyframes aparecer {
-  0% {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.message-item {
-  animation: aparecer 0.3s ease forwards;
-}
-
   </style>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+
 </head>
+
 <body>
-<section id="chat">
-  <header>Chat UGMA</header>
 
-  <div class="chat-container">
-    <div class="messages" id="messages">
-      <!-- Aquí se agregarán los mensajes dinámicamente -->
+
+  <section id="chat">
+    <header id="menuToggle">Chat UGMA</header>
+
+<nav class="side-menu" id="sideMenu">
+  <ul>
+    <li><i class="fa-regular fa-bookmark"></i> Mensajes destacados</li>
+    <li><i class="fa-regular fa-circle-question"></i> Información</li>
+    <li id="logout"><i class="fa-solid fa-arrow-right-from-bracket"></i> Cerrar sesión</li>
+  </ul>
+</nav>
+
+
+    <div class="chat-container">
+      <div class="messages" id="messages"></div>
+
+      <form class="input-area" id="form">
+        <input type="text" placeholder="Agrega un mensaje..." id="inputMessage" autocomplete="off">
+        <button type="submit">Enviar</button>
+      </form>
     </div>
+  </section>
 
-     <form class="input-area" id="form">
-      <input type="text" placeholder="Agrega un mensaje..." id="inputMessage" autocomplete="off">
-      <button type="submit" id="submit">Enviar</button>
-    </form>
-</section>
+  <script>
+        const sideMenu = document.getElementById("sideMenu");
+    const header = document.getElementById("menuToggle");
+    const logoutBtn = document.getElementById("logout");
+
+    header.addEventListener("click", () => {
+      sideMenu.classList.toggle("active");
+    });
+
+    logoutBtn.addEventListener("click", () => {
+      window.location.href = "/login.html";
+    });
+
+  </script>
+
 </body>
 </html>
+

@@ -1,10 +1,14 @@
+import dotenv from 'dotenv'
+dotenv.config()
 import express from 'express'
 import logger from 'morgan'
+import {createClient} from "@libsql/client";
 
 import {Server} from 'socket.io'
 import {createServer} from 'node:http'
 import { Socket } from 'node:dgram'
 import { on } from 'node:events'
+
 
 const port = process.env.PORT ?? 3003
 
@@ -12,17 +16,59 @@ const app = express()
 const server = createServer(app)
 const io = new Server(server);
 
-io.on('connection', (socket) => {
+const db = createClient({
+  url: process.env.TURSO_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN
+});
+
+app.use(express.json())
+
+io.on('connection', async (socket) => {
+
+  const userId = socket.handshake.auth?.userId
+  const rol = socket.handshake.auth?.rol
+console.log("Auth del usuario:", socket.handshake.auth)
   console.log('a user has connected!')
 
   socket.on('disconnect', () => {
     console.log('an user has disconnected!')
   })
 
-  socket.on('chat message', (msg) => {
+  socket.on('chat message', async (msg) => {
+
+    let result
+
+    try {
+      result = await db.execute({
+        sql: `INSERT INTO mensaje (texto) VALUES (:msg)`,
+        args: {msg}
+      });
+    } catch (e){
+      console.error(e)
+      return
+
+    }
     console.log('message: ' + msg)
-    io.emit('chat message', msg)
+    io.emit('chat message', msg, result.lastInsertRowid.toString())
+    BigInt.prototype.toJSON = function() { return this.toString(); }
+
   })
+  if (!socket.recovered){ // recuperar los mensajes de la base de datos
+    try {
+      const results = await db.execute({
+        sql: 'SELECT id, texto FROM mensaje WHERE id > ?',
+        args: [socket.recovered.auth?.serverOffset ?? 0]
+      })
+
+results.rows.forEach(row => {
+  socket.emit('chat message', row.texto, row.id.toString())
+})
+
+    }catch (e){
+      console.error(e)
+      return
+    }
+  }
 })
 
 app.use(logger('dev'))
@@ -35,9 +81,72 @@ app.get('/chat', (req, res) => {
   res.sendFile(process.cwd() + '/client/index.html');
 });
 
+app.get('/register', (req, res) => {
+  res.sendFile(process.cwd() + '/client/registro.html');
+});
+
 app.use(express.static(process.cwd() + '/client'));
 
 
 server.listen(port, () => {
   console.log(`Server running on port ${port}`)
 })
+
+// RUTA PARA REGISTRO EN TURSO
+app.post('/api/register', async (req, res) => {
+  try {
+    const { cedula, nombre, rol, clave } = req.body
+
+    if (!cedula || !rol || !clave) {
+      return res.status(400).json({ message: "Datos incompletos" })
+    }
+
+    await db.execute({
+      sql: `INSERT INTO usuario (cedula, nombre, rol, clave) VALUES (?, ?, ?, ?)`,
+      args: [cedula, nombre, rol, clave]
+    })
+
+    res.json({ success: true })
+
+  } catch (err) {
+    console.error(err)
+    if (err.message.includes("UNIQUE"))
+      return res.status(400).json({ message: "Este usuario ya está registrado" })
+    
+    res.status(500).json({ message: "Error en servidor" })
+  }
+})
+
+// RUTA DE INICIO DE SESION
+
+app.post("/api/login", async (req, res) => {
+  try {
+    const { cedula, clave } = req.body;
+
+    const result = await db.execute({
+      sql: "SELECT * FROM usuario WHERE cedula = ? AND clave = ?",
+      args: [cedula, clave]
+    });
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ success: false, message: "Credenciales inválidas" });
+    }
+
+    const user = result.rows[0];
+    
+
+    // 🔹 Imprimir en consola el ID del usuario que inicia sesión
+    console.log(`Usuario logueado: ID=${user.id}, Nombre=${user.nombre}, Rol=${user.rol}`);
+
+    return res.json({ success: true });
+    
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Error interno" });
+  }
+});
+
+
+
+
