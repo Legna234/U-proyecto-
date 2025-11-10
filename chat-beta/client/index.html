@@ -7,12 +7,19 @@
   <title>Chat UGMA</title>
 
   <script type="module">
+
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      // Si no hay usuario, redirige al login
+      window.location.href = '/login';
+    }
+
+
     import { io } from 'https://cdn.socket.io/4.3.2/socket.io.esm.min.js'
 
     const socket = io({
       auth: {
-      userId: 0,
-      rol: 0,
+      userId: userId,
         serverOffset: 0
       }
     })
@@ -20,24 +27,62 @@
     const inputMessage = document.getElementById('inputMessage')
     const messages = document.getElementById('messages')
 
-    socket.on('chat message', (msg, serverOffset) => {
-      const item = `<li class="message-item received">${msg}</li>`
-      messages.insertAdjacentHTML('beforeend', item)
-      socket.auth.serverOffset = serverOffset
-      messages.scrollTop = messages.scrollHeight
-    })
+socket.on('chat message', (data) => {
+  const clase = Number(data.userId) === Number(userId) ? 'sent' : 'received';
+  const nombre = data.nombre || 'Usuario';
+  const rol = data.rol || 'Invitado';
+  
+  // Agrupación por fecha
+  const fechaMensaje = new Date(data.fecha_envio).toLocaleDateString('es-ES', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+
+  let grupoFecha = document.querySelector(`.grupo-fecha[data-fecha="${fechaMensaje}"]`);
+  if (!grupoFecha) {
+    grupoFecha = document.createElement('div');
+    grupoFecha.classList.add('grupo-fecha');
+    grupoFecha.dataset.fecha = fechaMensaje;
+    grupoFecha.innerHTML = `<div class="fecha-header">${fechaMensaje}</div>`;
+    messages.appendChild(grupoFecha);
+  }
+
+  const item = document.createElement('div');
+  item.classList.add('message-item', clase);
+  item.innerHTML = `
+    <div class="user-info">
+      <span class="user-name">${nombre}</span>
+      <span class="user-role">(${rol})</span>
+    </div>
+    <div class="message-text">${data.text}</div>
+  `;
+
+  grupoFecha.appendChild(item);
+  socket.auth.serverOffset = data.id;
+  messages.scrollTop = messages.scrollHeight;
+});
+
+
+
 
     form.addEventListener('submit', (e) => {
-      e.preventDefault()
-      const message = inputMessage.value.trim()
+      e.preventDefault();
+      const message = inputMessage.value.trim();
       if (message) {
-        const item = `<li class="message-item sent">${message}</li>`
-        messages.insertAdjacentHTML('beforeend', item)
-        socket.emit('chat message', message)
-        inputMessage.value = ''
-        messages.scrollTop = messages.scrollHeight
+
+        // Enviar al servidor con el userId
+        socket.emit('chat message', {
+          userId,
+          text: message
+        });
+
+        inputMessage.value = '';
+        messages.scrollTop = messages.scrollHeight;
       }
     })
+
   </script>
 
   <style>
@@ -161,6 +206,43 @@
       background-color: var(--amarillo-pastel);
       border-top-right-radius: 0;
     }
+
+.user-info {
+  font-size: 0.8em;
+  color: #555;
+  margin-bottom: 3px;
+}
+
+.user-name {
+  font-weight: bold;
+  color: var(--azul-oscuro);
+}
+
+.user-role {
+  font-style: italic;
+  color: #666;
+  margin-left: 5px;
+}
+
+/* 🔹 Agrupación por fecha */
+.grupo-fecha {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.fecha-header {
+  background-color: var(--azul-oscuro);
+  color: var(--amarillo-pastel);
+  font-size: 0.85em;
+  padding: 5px 12px;
+  border-radius: 15px;
+  margin: 10px 0;
+  text-transform: capitalize;
+}
+
+
 
     .input-area {
       display: flex;

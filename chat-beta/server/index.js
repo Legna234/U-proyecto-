@@ -10,7 +10,7 @@ import { Socket } from 'node:dgram'
 import { on } from 'node:events'
 
 
-const port = process.env.PORT ?? 3003
+const port = process.env.PORT ?? 3002
 
 const app = express()
 const server = createServer(app)
@@ -34,36 +34,75 @@ console.log("Auth del usuario:", socket.handshake.auth)
     console.log('an user has disconnected!')
   })
 
-  socket.on('chat message', async (msg) => {
+      socket.on('chat message', async (data) => {
+      const { userId, text } = data;
+      let result;
 
-    let result
+      try {
+        result = await db.execute({
+          sql: `INSERT INTO mensaje (texto, id_usuario, fecha_envio) VALUES (:text, :userId, datetime('now'))`,
+          args: { text, userId }
+        });
 
-    try {
-      result = await db.execute({
-        sql: `INSERT INTO mensaje (texto) VALUES (:msg)`,
-        args: {msg}
-      });
-    } catch (e){
-      console.error(e)
-      return
+    // Obtener el usuario que envió el mensaje
+    const userResult = await db.execute({
+      sql: `SELECT nombre, rol FROM usuario WHERE id = ?`,
+      args: [userId]
+    });
 
-    }
-    console.log('message: ' + msg)
-    io.emit('chat message', msg, result.lastInsertRowid.toString())
-    BigInt.prototype.toJSON = function() { return this.toString(); }
+    const user = userResult.rows[0];
+    const rolNombre = user.rol === 1 ? "Estudiante" : user.rol === 2 ? "Profesor" : "Invitado";
 
-  })
+    // Reenviar mensaje con toda la información
+    io.emit('chat message', {
+      id: result.lastInsertRowid.toString(),
+      text,
+      userId,
+      nombre: user.nombre,
+      rol: rolNombre
+    });
+
+      } catch (e) {
+        console.error(e);
+        return;
+      }
+
+      console.log(`Mensaje de ${userId}: ${text}`);
+      //io.emit('chat message', { text, userId, id: result.lastInsertRowid.toString() });
+      //BigInt.prototype.toJSON = function() { return this.toString(); };
+    })
+    
   if (!socket.recovered){ // recuperar los mensajes de la base de datos
     try {
-      const results = await db.execute({
-        sql: 'SELECT id, texto FROM mensaje WHERE id > ?',
-        args: [socket.recovered.auth?.serverOffset ?? 0]
-      })
+    const results = await db.execute({
+      sql: `
+        SELECT 
+          m.id, 
+          m.id_usuario, 
+          m.texto, 
+          m.fecha_envio, 
+          u.nombre, 
+          u.rol 
+        FROM mensaje m
+        LEFT JOIN usuario u ON m.id_usuario = u.id
+        WHERE m.id > ?
+        ORDER BY m.fecha_envio ASC
+      `,
+      args: [socket.recovered.auth?.serverOffset ?? 0]
+    });
 
-results.rows.forEach(row => {
-  socket.emit('chat message', row.texto, row.id.toString())
-})
-
+    results.rows.forEach(row => {
+      const rolNombre = row.rol === 1 ? "Estudiante" : row.rol === 2 ? "Profesor" : "Invitado";
+      socket.emit('chat message', {
+        id: row.id.toString(),
+        text: row.texto,
+        userId: row.id_usuario,
+        nombre: row.nombre || 'Desconocido',
+        rol: rolNombre,
+        fecha_envio: row.fecha_envio
+      });
+    });
+  
     }catch (e){
       console.error(e)
       return
@@ -138,7 +177,17 @@ app.post("/api/login", async (req, res) => {
     // 🔹 Imprimir en consola el ID del usuario que inicia sesión
     console.log(`Usuario logueado: ID=${user.id}, Nombre=${user.nombre}, Rol=${user.rol}`);
 
-    return res.json({ success: true });
+    return res.json({
+      success: true,
+      user: {
+        id: user.id,
+        nombre: user.nombre,
+        rol: user.rol,
+        cedula: user.cedula
+      }
+    });
+
+
     
 
   } catch (error) {

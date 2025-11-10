@@ -137,6 +137,8 @@ function togglePass(id) {
     if (response.ok && data.success) {
     console.log("Login exitoso ✅");
 
+   localStorage.setItem('userId', data.user.id); // guarda el ID del usuario
+  localStorage.setItem('userRol', data.user.rol); // opcional si lo usarás luego
     
     window.location.href = "/chat"; 
     } else {
